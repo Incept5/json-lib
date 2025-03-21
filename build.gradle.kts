@@ -1,16 +1,21 @@
-// Always set a default version first
-version = "1.0.0-SNAPSHOT"  // Default version
-
 // For local builds, use 0-SNAPSHOT. For CI builds, use the build number from CircleCI
 // If a specific version is provided (e.g., from JitPack), use that instead
 val providedVersion = findProperty("version") as? String
 val buildNumber = findProperty("buildNumber") as? String
 
-// Override default version if parameters are provided
-if (providedVersion != null && providedVersion.isNotEmpty()) {
-    version = providedVersion
-} else if (buildNumber != null && buildNumber.isNotEmpty()) {
+// Set version based on parameters
+if (buildNumber != null && buildNumber.isNotEmpty()) {
+    // If buildNumber is provided, use it
     version = "1.0.$buildNumber"
+    println("Using build number for version: $version")
+} else if (providedVersion != null && providedVersion != "unspecified" && providedVersion.isNotEmpty()) {
+    // If explicit version is provided, use it
+    version = providedVersion
+    println("Using provided version: $version")
+} else {
+    // Default version
+    version = "1.0.0-SNAPSHOT"
+    println("Using default version: $version")
 }
 
 // Always ensure we have a valid group ID

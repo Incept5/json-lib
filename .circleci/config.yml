@@ -51,6 +51,34 @@ jobs:
             git tag -a "${VERSION}" -m "Release version ${VERSION}"
             git push origin "${VERSION}"
       - run:
+          name: Create GitHub Release
+          command: |
+            VERSION="1.0.${BUILD_NUMBER}"
+            
+            # Install GitHub CLI if not already installed
+            if ! command -v gh &> /dev/null; then
+              echo "Installing GitHub CLI..."
+              curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+              echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+              sudo apt update -y
+              sudo apt install gh -y
+            fi
+            
+            # Authenticate with GitHub using GITHUB_TOKEN environment variable
+            echo "Creating GitHub Release for version ${VERSION}..."
+            if [ -n "$GITHUB_TOKEN" ]; then
+              gh auth login --with-token <<< "$GITHUB_TOKEN"
+              gh release create "${VERSION}" \
+                --title "Release ${VERSION}" \
+                --notes "Release version ${VERSION} built by CircleCI (Build #${BUILD_NUMBER})" \
+                --repo "incept5/json-lib"
+              echo "GitHub Release created successfully!"
+            else
+              echo "GITHUB_TOKEN not set. Skipping GitHub Release creation."
+              echo "Please add GITHUB_TOKEN to CircleCI environment variables to enable automatic GitHub Release creation."
+            fi
+      
+      - run:
           name: Trigger JitPack Build
           command: |
             VERSION="1.0.${BUILD_NUMBER}"
