@@ -13,7 +13,14 @@ install:
       VERSION=$(git rev-parse --short HEAD);
       echo "Using commit hash as version: $VERSION";
     fi
-  - echo "Building version $VERSION"
+  
+  # Check if this is a SNAPSHOT version - if so, skip JitPack build
+  - if [[ "$VERSION" == *"-SNAPSHOT" ]]; then
+      echo "SNAPSHOT versions are not published to JitPack. Skipping build.";
+      exit 0;
+    fi
+  
+  - echo "Building release version $VERSION"
   - ./gradlew build publishToMavenLocal -Pversion=$VERSION
   - echo "Published artifacts to local Maven repository"
   - find ~/.m2/repository -name "json-lib*" | grep "com/github/incept5" | sort

@@ -1,0 +1,24 @@
+{
+  "spec": "ensure that when circleci builds the project that the version number is only incremented when the main branch has been updated\nOnly use snapshot versions for branch builds\ndo not publish snapshots to jitpack, only to local maven repository",
+  "commitMessage": "Update CircleCI configuration to handle versioning based on branch:\n- Main branch: Increment version numbers and publish to JitPack\n- Other branches: Use SNAPSHOT versions and only publish to local Maven\n- Updated jitpack.yml to skip SNAPSHOT builds\n- Improved version handling in build.gradle.kts",
+  "stats": {
+    "inputTokens": 51795,
+    "cacheWriteTokens": 6305,
+    "cacheReadTokens": 50440,
+    "outputTokens": 5082,
+    "totalTokens": 0,
+    "cost": 0.17371125,
+    "currency": "gbp",
+    "processingMillis": 92308,
+    "git": {
+      "filesChanged": 4,
+      "insertions": 127,
+      "deletions": 25,
+      "linesChanged": 127,
+      "testFilesChanged": 0,
+      "testInsertions": 0,
+      "testDeletions": 0,
+      "testLinesChanged": 0
+    }
+  }
+}

@@ -1,19 +1,22 @@
-// For local builds, use 0-SNAPSHOT. For CI builds, use the build number from CircleCI
-// If a specific version is provided (e.g., from JitPack), use that instead
+// Version handling:
+// 1. If explicit version is provided via -Pversion, use it (for both releases and snapshots)
+// 2. If buildNumber is provided via -PbuildNumber, use it to create a release version
+// 3. Default to local development SNAPSHOT version
 val providedVersion = findProperty("version") as? String
 val buildNumber = findProperty("buildNumber") as? String
 
 // Set version based on parameters
-if (buildNumber != null && buildNumber.isNotEmpty()) {
-    // If buildNumber is provided, use it
-    version = "1.0.$buildNumber"
-    println("Using build number for version: $version")
-} else if (providedVersion != null && providedVersion != "unspecified" && providedVersion.isNotEmpty()) {
-    // If explicit version is provided, use it
+if (providedVersion != null && providedVersion != "unspecified" && providedVersion.isNotEmpty()) {
+    // If explicit version is provided, use it (highest priority)
+    // This allows CircleCI to set specific versions for both releases and snapshots
     version = providedVersion
     println("Using provided version: $version")
+} else if (buildNumber != null && buildNumber.isNotEmpty()) {
+    // If buildNumber is provided, use it for a release version
+    version = "1.0.$buildNumber"
+    println("Using build number for version: $version")
 } else {
-    // Default version
+    // Default version for local development
     version = "1.0.0-SNAPSHOT"
     println("Using default version: $version")
 }
