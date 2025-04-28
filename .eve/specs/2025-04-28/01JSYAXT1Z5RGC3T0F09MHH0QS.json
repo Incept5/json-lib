@@ -1,0 +1,24 @@
+{
+  "spec": "When running the circleci build this error is happening:\nError calling workflow: 'build-test-publish'\nError calling job: 'publish-main-release'\nUnclosed '<<' tag\n('<<' must be escaped as '\\<<' in config v2.1+)\n  gh auth login --with-token <<< \"$GITHUB_TOKEN\"",
+  "commitMessage": "Fix CircleCI config: Replace heredoc syntax with pipe for GitHub token authentication",
+  "stats": {
+    "inputTokens": 4883,
+    "cacheWriteTokens": 6305,
+    "cacheReadTokens": 12610,
+    "outputTokens": 690,
+    "totalTokens": 0,
+    "cost": 0.01874925,
+    "currency": "gbp",
+    "processingMillis": 17254,
+    "git": {
+      "filesChanged": 1,
+      "insertions": 1,
+      "deletions": 1,
+      "linesChanged": 1,
+      "testFilesChanged": 0,
+      "testInsertions": 0,
+      "testDeletions": 0,
+      "testLinesChanged": 0
+    }
+  }
+}

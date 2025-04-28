@@ -92,7 +92,7 @@ jobs:
             # Authenticate with GitHub using GITHUB_TOKEN environment variable
             echo "Creating GitHub Release for version ${VERSION}..."
             if [ -n "$GITHUB_TOKEN" ]; then
-              gh auth login --with-token <<< "$GITHUB_TOKEN"
+              echo "$GITHUB_TOKEN" | gh auth login --with-token
               gh release create "${VERSION}" \
                 --title "Release ${VERSION}" \
                 --notes "Release version ${VERSION} built by CircleCI (Build #${BUILD_NUMBER})" \
