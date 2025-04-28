@@ -5,10 +5,22 @@ orbs:
 
 jobs:
   build-and-test:
-    docker:
-      - image: cimg/openjdk:21.0
+    machine:
+      image: ubuntu-2204:current
     steps:
       - checkout
+      - run:
+          name: Install JDK 21
+          command: |
+            sudo apt-get update -y
+            sudo apt-get install -y openjdk-21-jdk
+            java -version
+      - run:
+          name: Ensure Docker is running
+          command: |
+            docker --version
+            docker info
+            docker ps
       - gradle/with_cache:
           steps:
             - run:
@@ -20,113 +32,164 @@ jobs:
           path: build/reports
           destination: reports
 
-  publish-branch-snapshot:
-    docker:
-      - image: cimg/openjdk:21.0
+  publish-to-jitpack:
+    machine:
+      image: ubuntu-2204:current
     steps:
       - checkout
       - run:
-          name: Set Version for Branch Build
+          name: Install JDK 21
           command: |
-            # For branch builds, use SNAPSHOT version with branch name
-            BRANCH_NAME=${CIRCLE_BRANCH//\//-}
-            echo "export VERSION=1.0.0-${BRANCH_NAME}-SNAPSHOT" >> $BASH_ENV
+            sudo apt-get update -y
+            sudo apt-get install -y openjdk-21-jdk
+            java -version
+      - run:
+          name: Ensure Docker is running
+          command: |
+            docker --version
+            docker info
+            docker ps
+      - run:
+          name: Set Version
+          command: |
+            # Check if we're on the main branch
+            if [ "${CIRCLE_BRANCH}" == "main" ]; then
+              # For main branch, use the build number for versioning
+              echo "export VERSION=1.0.${CIRCLE_BUILD_NUM}" >> $BASH_ENV
+              echo "export IS_MAIN_BRANCH=true" >> $BASH_ENV
+            else
+              # For other branches, use SNAPSHOT versioning
+              echo "export VERSION=1.0.0-SNAPSHOT" >> $BASH_ENV
+              echo "export IS_MAIN_BRANCH=false" >> $BASH_ENV
+            fi
             source $BASH_ENV
-            echo "Using SNAPSHOT version for branch build: ${VERSION}"
+            echo "Using version: ${VERSION}"
       - gradle/with_cache:
           steps:
             - run:
-                name: Build with SNAPSHOT Version
-                command: ./gradlew clean build -Pversion=${VERSION}
-            - run:
-                name: Publish to Local Maven Repository Only
-                command: ./gradlew publishToMavenLocal -Pversion=${VERSION}
-      - run:
-          name: Verify Local Maven Repository
-          command: |
-            echo "Verifying local artifacts:"
-            find ~/.m2/repository -name "json-lib*" | grep "com/github/incept5" | sort
-            echo "SNAPSHOT artifacts published to local Maven repository only (not to JitPack)"
-
-  publish-main-release:
-    docker:
-      - image: cimg/openjdk:21.0
-    steps:
-      - checkout
-      - run:
-          name: Set Build Number for Release
-          command: |
-            # Use the CircleCI build number for versioning main branch builds
-            echo "export BUILD_NUMBER=${CIRCLE_BUILD_NUM}" >> $BASH_ENV
-            echo "export VERSION=1.0.${CIRCLE_BUILD_NUM}" >> $BASH_ENV
-            source $BASH_ENV
-            echo "Using release version: ${VERSION}"
-      - gradle/with_cache:
-          steps:
-            - run:
-                name: Build with Release Version
-                command: ./gradlew clean build -Pversion=${VERSION}
+                name: Build with Version
+                command: |
+                  echo "Using version: ${VERSION}"
+                  ./gradlew clean build -Pversion=${VERSION}
             - run:
                 name: Publish to Local Maven Repository
-                command: ./gradlew publishToMavenLocal -Pversion=${VERSION}
+                command: |
+                  echo "Publishing with version: ${VERSION}"
+                  ./gradlew publishToMavenLocal -Pversion=${VERSION}
       - run:
           name: Create and Push Git Tag
           command: |
-            echo "Creating tag for version: ${VERSION}"
-            git config user.email "ci@incept5.com"
-            git config user.name "CircleCI"
-            git tag -a "${VERSION}" -m "Release version ${VERSION}"
-            git push origin "${VERSION}"
+            # Only create tags for main branch builds
+            if [ "${IS_MAIN_BRANCH}" == "true" ]; then
+              echo "Creating tag for version: ${VERSION}"
+              git config user.email "ci@incept5.com"
+              git config user.name "CircleCI"
+            
+              # Check if tag already exists
+              if git rev-parse "${VERSION}" >/dev/null 2>&1; then
+                echo "Tag ${VERSION} already exists, skipping tag creation"
+              else
+                echo "Creating new tag ${VERSION}"
+                git tag -a "${VERSION}" -m "Release version ${VERSION}"
+                git push origin "${VERSION}"
+              fi
+            else
+              echo "Skipping tag creation for non-main branch build"
+            fi
       - run:
-          name: Create GitHub Release
+          name: Verify Local Maven Repository
           command: |
-            # Install GitHub CLI if not already installed
-            if ! command -v gh &> /dev/null; then
-              echo "Installing GitHub CLI..."
-              curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-              echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-              sudo apt update -y
-              sudo apt install gh -y
+            # Debug information
+            echo "Maven repository location: $HOME/.m2/repository"
+            echo "Using version: ${VERSION}"
+            
+            # List all artifacts in the local Maven repository
+            echo "All artifacts in Maven repository:"
+            find $HOME/.m2/repository/com/github/incept5 -type f -name "*.jar" | sort
+            
+            # Verify that JARs exist locally
+            if [ ! -f "$HOME/.m2/repository/com/github/incept5/json-lib/${VERSION}/json-lib-${VERSION}.jar" ]; then
+              echo "json-lib JAR not found locally at expected path"
+              echo "Expected: $HOME/.m2/repository/com/github/incept5/json-lib/${VERSION}/json-lib-${VERSION}.jar"
+            
+              # Check if the directory exists
+              if [ -d "$HOME/.m2/repository/com/github/incept5/json-lib" ]; then
+                echo "Available versions for json-lib:"
+                ls -la "$HOME/.m2/repository/com/github/incept5/json-lib/"
+              fi
+            
+              # Try to find it elsewhere
+              echo "Searching for json-lib JAR:"
+              find $HOME/.m2/repository -name "json-lib-*.jar" | sort
+            
+              # Try one more publish with explicit version
+              echo "Attempting one more publish with explicit version ${VERSION}"
+              ./gradlew :json-lib:clean :json-lib:build :json-lib:publishToMavenLocal -Pversion=${VERSION} --stacktrace
+            
+              # Check again
+              if [ -f "$HOME/.m2/repository/com/github/incept5/json-lib/${VERSION}/json-lib-${VERSION}.jar" ]; then
+                echo "Successfully published json-lib JAR after retry"
+              else
+                echo "Failed to publish json-lib JAR after retry"
+                exit 1
+              fi
             fi
             
-            # Authenticate with GitHub using GITHUB_TOKEN environment variable
-            echo "Creating GitHub Release for version ${VERSION}..."
-            if [ -n "$GITHUB_TOKEN" ]; then
-              echo "$GITHUB_TOKEN" | gh auth login --with-token
-              gh release create "${VERSION}" \
-                --title "Release ${VERSION}" \
-                --notes "Release version ${VERSION} built by CircleCI (Build #${BUILD_NUMBER})" \
-                --repo "incept5/json-lib"
-              echo "GitHub Release created successfully!"
-            else
-              echo "GITHUB_TOKEN not set. Skipping GitHub Release creation."
-              echo "Please add GITHUB_TOKEN to CircleCI environment variables to enable automatic GitHub Release creation."
-            fi
-      
+            
+            echo "All artifacts verified in local Maven repository"
+
+      # Only trigger JitPack for main branch builds
       - run:
           name: Trigger JitPack Build
           command: |
-            # Verify local artifacts
-            echo "Verifying local artifacts:"
-            find ~/.m2/repository -name "json-lib*" | grep "com/github/incept5" | sort
+            # Only publish to JitPack for main branch builds
+            if [ "${IS_MAIN_BRANCH}" == "true" ]; then
+              echo "Triggering JitPack build for version ${VERSION}"
+              # Trigger the root project build on JitPack
+              curl -s "https://jitpack.io/com/github/incept5/json-lib/${VERSION}/json-lib-${VERSION}.pom" || true
             
-            # Trigger JitPack build by making a request to the JitPack URL with the version tag
-            echo "Triggering JitPack build for version ${VERSION}"
-            curl -s "https://jitpack.io/com/github/incept5/json-lib/${VERSION}/json-lib-${VERSION}.pom" || true
+              echo "JitPack build triggered for version ${VERSION}"
             
-            echo "JitPack build triggered for version ${VERSION}"
-            echo "Artifacts will be available at: https://jitpack.io/#com.github.incept5/json-lib/${VERSION}"
+              # Wait for JitPack to process the build
+              echo "Waiting for JitPack to process the build..."
+              sleep 180  # Increased wait time to allow JitPack to process
             
-            # Wait for JitPack to process the build (optional)
-            echo "Waiting for JitPack to process the build..."
-            sleep 60
+              # Verify the build status for the root project
+              ROOT_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://jitpack.io/com/github/incept5/json-lib/${VERSION}/json-lib-${VERSION}.pom")
+              if [ "$ROOT_STATUS" -eq 200 ]; then
+                echo "Root project successfully published to JitPack!"
+              else
+                echo "Root project not found on JitPack. Status code: $ROOT_STATUS"
+                echo "Check status at: https://jitpack.io/#incept5/json-lib/${VERSION}"
+              fi
+          
             
-            # Verify the build status
-            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://jitpack.io/com/github/incept5/json-lib/${VERSION}/json-lib-${VERSION}.pom")
-            if [ "$HTTP_STATUS" -eq 200 ]; then
-              echo "JitPack build successful!"
+              # Final verification
+              if [ "$ROOT_STATUS" -eq 200 ]  then
+                echo "All artifacts successfully published to JitPack!"
+              else
+                echo "WARNING: One or more artifacts may not be available yet on JitPack."
+                echo "This is normal as JitPack may take some time to process the build."
+                echo ""
+                echo "To use these artifacts in your project:"
+                echo "1. Add the JitPack repository to your build file"
+                echo "   repositories {"
+                echo "     maven { url 'https://jitpack.io' }"
+                echo "   }"
+                echo ""
+                echo "2. Add the dependencies"
+                echo "   dependencies {"
+                echo "     implementation 'com.github.incept5.json-lib:${VERSION}'"
+                echo "   }"
+                echo ""
+                echo "3. Or use the root project (includes all modules)"
+                echo "   dependencies {"
+                echo "     implementation 'com.github.incept5:json-lib:${VERSION}'"
+                echo "   }"
+              fi
             else
-              echo "JitPack build may still be in progress. Check status at: https://jitpack.io/com/github/incept5/json-lib/${VERSION}"
+              echo "Skipping JitPack publication for non-main branch build"
+              echo "SNAPSHOT version ${VERSION} is only published to local Maven repository"
             fi
 
 workflows:
@@ -134,17 +197,6 @@ workflows:
   build-test-publish:
     jobs:
       - build-and-test
-      # For main branch: increment version and publish to JitPack
-      - publish-main-release:
+      - publish-to-jitpack:
           requires:
             - build-and-test
-          filters:
-            branches:
-              only: main
-      # For all other branches: use SNAPSHOT version and only publish locally
-      - publish-branch-snapshot:
-          requires:
-            - build-and-test
-          filters:
-            branches:
-              ignore: main
