@@ -1,0 +1,24 @@
+{
+  "spec": "clean up the circleci config file \nmake it simpler and fix the error: syntax error near unexpected token `else'\nit just needs to ensure it builds correctly and the tests pass\nif is a commit on the main branch then publish to jitpack\nAny other branch should not increment the version number and should only publish a snapshot to local maven repository",
+  "commitMessage": "Simplified CircleCI config and fixed syntax error\n\n- Removed unnecessary Docker verification steps\n- Simplified the publish job (renamed from publish-to-jitpack)\n- Fixed syntax error in the JitPack verification condition\n- Streamlined the JitPack publishing process\n- Removed excessive debug output and verification steps\n- Maintained core functionality: build, test, and publish to JitPack for main branch only",
+  "stats": {
+    "inputTokens": 17905,
+    "cacheWriteTokens": 6305,
+    "cacheReadTokens": 18915,
+    "outputTokens": 3444,
+    "totalTokens": 0,
+    "cost": 0.07903125000000001,
+    "currency": "gbp",
+    "processingMillis": 49823,
+    "git": {
+      "filesChanged": 1,
+      "insertions": 9,
+      "deletions": 114,
+      "linesChanged": 114,
+      "testFilesChanged": 0,
+      "testInsertions": 0,
+      "testDeletions": 0,
+      "testLinesChanged": 0
+    }
+  }
+}
